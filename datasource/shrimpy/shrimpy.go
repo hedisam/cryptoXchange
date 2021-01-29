@@ -23,7 +23,7 @@ type Shrimpy struct {
 
 func NewShrimpyDataSource(cfg *config.Config) (*Shrimpy, error) {
 	if cfg.DataSource.APIKey == "" || cfg.DataSource.SecretKey == "" {
-		return nil, fmt.Errorf("[ShrimpyDataSource] invalid api_key/secret_key is provided")
+		return nil, fmt.Errorf("[ShrimpyDataSource] invalid api_key/secret_key")
 	}
 
 	shConfig := &shrimpyConfig{

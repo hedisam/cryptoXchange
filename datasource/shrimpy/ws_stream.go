@@ -3,16 +3,17 @@ package shrimpy
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
+	"sync"
 )
 
 type dataStream struct {
 	data <-chan []byte
 	errors <-chan error
-	cmdErrors <-chan error
 }
 
+// createStream connects to the ws server and returns a dataStream object containing the outbound channel.
 func createStream(cfg *shrimpyConfig, cmdChan <-chan interface{}, done <-chan struct{}) (*dataStream, error) {
-	// the subscription requires a valid wsToken
+	// the subscription requires a valid ws token
 	token, err := getToken(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("[createStream] couldn't get a stream wsToken: %w", err)
@@ -25,27 +26,30 @@ func createStream(cfg *shrimpyConfig, cmdChan <-chan interface{}, done <-chan st
 		return nil, fmt.Errorf("[createStream] websocket dial failed: %w", err)
 	}
 
-	data := make(chan []byte, 10)
-	errors := make(chan error, 1)
-	cmdErrors := make(chan error, 2)
+	data := make(chan []byte)
+	errors := make(chan error)
+	var wg sync.WaitGroup
 
 	go func() {
-		defer close(cmdErrors)
+		defer func() {
+			wg.Wait()
+			close(errors)
+			_ = client.Close()
+		}()
 		for {
 			select {
 			case <-done: return
 			case cmd := <-cmdChan:
 				wErr := client.WriteJSON(cmd)
 				if wErr != nil {
-					cmdErrors <- fmt.Errorf("[createStream] could not send message: %w", wErr)
+					errors <- fmt.Errorf("[createStream] could not send message: %w", wErr)
 				}
 			}
 		}
 	}()
 
 	go func() {
-		defer client.Close()
-		defer close(errors)
+		defer wg.Done()
 		defer close(data)
 
 		// reading the socket
@@ -63,5 +67,5 @@ func createStream(cfg *shrimpyConfig, cmdChan <-chan interface{}, done <-chan st
 		}
 	}()
 
-	return &dataStream{data: data, errors: errors, cmdErrors: cmdErrors}, nil
+	return &dataStream{data: data, errors: errors}, nil
 }

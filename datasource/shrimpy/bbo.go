@@ -26,22 +26,19 @@ func (source *Shrimpy) BBOStream(done <-chan struct{}, pairs ...string) error {
 		}
 	}
 
-	processorInputChan := make(chan []byte, 20)
-	defer close(processorInputChan)
+	parserChan := make(chan []byte, 20)
+	defer close(parserChan)
 
-	status := processStream(done, processorInputChan)
+	parserStatusChan := processStream(done, parserChan)
 
 	for {
 		select {
 		case <-done: return nil
 		case body := <-stream.data:
-			processorInputChan <- body
+			parserChan <- body
 		case err = <-stream.errors:
 			return fmt.Errorf("[BBOStream] stream error: %w", err)
-		case err, active := <-stream.cmdErrors:
-			if !active {return nil} // this message has been received because the channel has been closed
-			return fmt.Errorf("[BBOStream] failed to send message to the server: %w", err)
-		case s, active := <-status:
+		case s, active := <-parserStatusChan:
 			if !active {return nil} // the processor's goroutine has exited due to the done chan been closed
 			ok, err := handleStatus(done, cmdChan, stream, s)
 			if !ok {
@@ -72,7 +69,7 @@ func sendMessage(done <-chan struct{}, cmdChan chan interface{}, stream *dataStr
 	select {
 	case <-done: return false, nil
 	case cmdChan <- msg: return true, nil
-	case err := <-stream.cmdErrors: return false, fmt.Errorf("[BBOStream] failed to send message: %s, err: %w", errTag, err)
+	case err := <-stream.errors: return false, fmt.Errorf("[BBOStream] failed to send message: %s, err: %w", errTag, err)
 	}
 }
 
