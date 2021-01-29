@@ -11,6 +11,7 @@ func (source *Shrimpy) BBOStream(done <-chan struct{}, pairs ...string) error {
 	}
 
 	cmdChan := make(chan interface{}, 3)
+	defer close(cmdChan)
 
 	stream, err := createStream(source.config, cmdChan, done)
 	if err != nil {

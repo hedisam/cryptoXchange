@@ -32,14 +32,17 @@ func createStream(cfg *shrimpyConfig, cmdChan <-chan interface{}, done <-chan st
 
 	go func() {
 		defer func() {
+			// signalling the receiver goroutine to return by disposing the ws client; in case of the done channel
+			// not been closed so the receiver won't get stuck on listening the ws socket.
+			_ = client.Close()
 			wg.Wait()
 			close(errors)
-			_ = client.Close()
 		}()
 		for {
 			select {
 			case <-done: return
-			case cmd := <-cmdChan:
+			case cmd, ok := <-cmdChan:
+				if !ok {return}
 				wErr := client.WriteJSON(cmd)
 				if wErr != nil {
 					errors <- fmt.Errorf("[createStream] could not send message: %w", wErr)
@@ -63,7 +66,11 @@ func createStream(cfg *shrimpyConfig, cmdChan <-chan interface{}, done <-chan st
 				errors <- fmt.Errorf("[createStream] websocket read error: %w", rErr)
 				return
 			}
-			data <- msg
+			select {
+			case <-done: return
+			case data <- msg:
+
+			}
 		}
 	}()
 
