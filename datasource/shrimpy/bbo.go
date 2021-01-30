@@ -2,83 +2,46 @@ package shrimpy
 
 import (
 	"fmt"
-	"log"
 )
 
-func (source *Shrimpy) BBOStream(done <-chan struct{}, pairs ...string) error {
-	if len(pairs) == 0 {
-		return fmt.Errorf("[BBOStream] no pairs found. at least one pair is needed")
+func (shrimpy *Shrimpy) BBO(done <-chan struct{}, pairs ...string) (<-chan StreamData, error) {
+	subs := make([]subscription, len(pairs))
+	for i, pair := range pairs {
+		subs[i] = subscription{
+			Type:     "subscribe",
+			Exchange: exchange,
+			Pair:     pair,
+			Channel:  "bbo",
+		}
 	}
 
-	cmdChan := make(chan interface{}, 3)
-	defer close(cmdChan)
+	return shrimpy.Subscribe(done, subs...)
+}
 
-	stream, err := createStream(source.config, cmdChan, done)
+func (shrimpy *Shrimpy) Subscribe(done <-chan struct{}, subscriptions ...subscription) (<-chan StreamData, error) {
+	if len(subscriptions) == 0 {
+		return nil, fmt.Errorf("[Subscribe] no subscriptions found")
+	}
+
+	// we use upstreamChan to send subscription requests & ping replies
+	upstreamChan := make(chan interface{})
+
+	stream, err := shrimpy.createStream(done, upstreamChan)
 	if err != nil {
-		return fmt.Errorf("[BBOStream] couldn't create the stream: %w", err)
+		return nil, fmt.Errorf("[Subscribe] couldn't create the stream: %w", err)
 	}
 
-	// request a subscription for each pair
-	for _, pair := range pairs {
-		msg := subscribeMessage("bbo", pair)
-		ok, err := sendMessage(done, cmdChan, stream, msg, fmt.Sprintf("BBO %s subscription", pair))
-		if !ok {
-			return err
-		}
-	}
-
-	parserChan := make(chan []byte, 20)
-	defer close(parserChan)
-
-	parserStatusChan := processStream(done, parserChan)
-
-	for {
+	// send the subscriptions list
+	for _, s := range subscriptions {
 		select {
-		case <-done: return nil
-		case body := <-stream.data:
-			parserChan <- body
-		case err = <-stream.errors:
-			return fmt.Errorf("[BBOStream] stream error: %w", err)
-		case s, active := <-parserStatusChan:
-			if !active {return nil} // the processor's goroutine has exited due to the done chan been closed
-			ok, err := handleStatus(done, cmdChan, stream, s)
-			if !ok {
-				return err
-			}
-
+		case <-done: return nil, nil
+		case upstreamChan <- s:
 		}
 	}
+	pout, errors := parser(done, stream.data, stream.errors)
+
+	output := outputer(done, pout, errors, upstreamChan)
+
+	return output, nil
 }
 
-func handleStatus(done <-chan struct{}, cmdChan chan interface{}, stream *dataStream, s *processorStatus) (bool, error) {
-	switch s.Type {
-	case ping:
-		pong := pingPong{Type: "pong", Data: s.pingData}
-		fmt.Printf("================\n%v: %v\n================\n", "pong message", pong)
-		return sendMessage(done, cmdChan, stream, pong, fmt.Sprintf("pong message: %v", pong))
-	case dataError:
-		return false, fmt.Errorf("[BBOStream] unable to process stream data: %w", s.err)
-	default:
-		log.Println("[BBOStream] unknown processor status:", s)
-		return false, nil
-	}
-}
-
-func sendMessage(done <-chan struct{}, cmdChan chan interface{}, stream *dataStream,
-		msg interface{}, errTag string) (bool, error) {
-
-	select {
-	case <-done: return false, nil
-	case cmdChan <- msg: return true, nil
-	case err := <-stream.errors: return false, fmt.Errorf("[BBOStream] failed to send message: %s, err: %w", errTag, err)
-	}
-}
-
-func subscribeMessage(channel, pair string) subUnsub {
-	return subUnsub{
-		Type:     "subscribe",
-		Exchange: exchange,
-		Pair:     pair,
-		Channel:  channel,
-	}
-}

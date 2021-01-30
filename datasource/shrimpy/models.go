@@ -1,7 +1,7 @@
 package shrimpy
 
 type PriceQuote struct {
-	Price string `json:"price"`
+	Price string `json:"Price"`
 	Quantity string `json:"quantity"`
 }
 
@@ -19,7 +19,7 @@ type PriceData struct {
 	Content PriceContent `json:"content"`
 }
 
-type subUnsub struct {
+type subscription struct {
 	Type string `json:"type"`
 	Exchange string `json:"exchange"`
 	Pair string `json:"pair"`
@@ -38,11 +38,11 @@ type Error struct {
 }
 
 type unknownData struct {
-	// having an Exchange field shows that we have a price message
+	// having an Exchange field shows that we have a Price message
 	Exchange string `json:"exchange"`
 	// both error and ping messages come with a Type field
 	Type string `json:"type"`
-	// ping pong messages come with a Data field
+	// ping pongListener messages come with a Data field
 	Data int64 `json:"data"`
 	// Code and Message are expected with an error message
 	Code int64 `json:"code"`

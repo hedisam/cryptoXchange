@@ -5,106 +5,69 @@ import (
 	"fmt"
 )
 
-const (
-	ping = iota
-	dataError
-)
-
-type processorStatus struct {
-	Type int
-	pingData int64
-	err error
-}
-
-func processStream(done <-chan struct{}, in <-chan []byte) <-chan *processorStatus {
-	statusChan := make(chan *processorStatus, 5)
-
+func parser(done <-chan struct{}, input <-chan []byte, errIn <- chan error) (<-chan interface{}, <-chan error) {
+	output := make(chan interface{})
+	errors := make(chan error)
 	go func() {
-		defer close(statusChan)
-		
+		defer close(output)
+		defer close(errors)
 		for {
 			select {
-			case body := <-in:
-				status := process(body)
-				if status != nil {
+			case <-done: return
+			case rawData, ok := <-input:
+				if !ok {return}
+				parsedData, err := parse(rawData)
+				if err != nil {
 					select {
-					case statusChan <- status:
-					case <-done: return
+					case <-done:
+					case errors <- err:
+					}
+				} else {
+					select {
+					case <-done:
+					case output <- parsedData:
 					}
 				}
-			case <-done: return
+			case err := <-errIn:
+				select {
+				case <-done:
+				case errors <- err:
+				}
 			}
 		}
 	}()
 
-	return statusChan
+	return output, errors
 }
 
-func process(body []byte) *processorStatus {
-	var dataUnknown unknownData
-	err := json.Unmarshal(body, &dataUnknown)
+func parse(b []byte) (interface{}, error) {
+	var data unknownData
+	err := json.Unmarshal(b, &data)
 	if err != nil {
-		return &processorStatus{Type: dataError, err:  fmt.Errorf("[processStream] unable to process data: %w", err)}
+		return nil, fmt.Errorf("[data parser] unable to parse data: %w", err)
 	}
 
-	if dataUnknown.Type != "" {
-		if dataUnknown.Type == "ping" {
-			return &processorStatus{Type: ping, pingData: dataUnknown.Data}
-		} else if dataUnknown.Type == "error" {
-			return &processorStatus{Type: dataError,
-				err: fmt.Errorf("[processStream] received an error message from the server; code %d - message: %s",
-					dataUnknown.Code, dataUnknown.Message)}
+	if data.Type != "" {
+		if data.Type == "ping" {
+			return pingPong{Type: "pong", Data: data.Data}, nil
+		} else if data.Type == "error" {
+			return nil, fmt.Errorf("error message from the server; code %d - message: %s",
+				data.Code, data.Message)
 		} else {
-			return &processorStatus{Type: dataError, err: fmt.Errorf("[processStream] unknown data: %v", dataUnknown)}
+			return nil, fmt.Errorf("[data parser] unknown data received: %v", data)
 		}
 	}
 
-	if dataUnknown.Exchange == "" {
-		return &processorStatus{Type: dataError, err: fmt.Errorf("[processStream] unknown data: %v", dataUnknown)}
+	if data.Exchange == "" {
+		return nil, fmt.Errorf("[data parser] unknown data received: %v", data)
 	}
 
-	// we have a price data. do whatever you want to do with it.
+	// we have a Price data
 	var priceData PriceData
-	err = json.Unmarshal(body, &priceData)
+	err = json.Unmarshal(b, &priceData)
 	if err != nil {
-		return &processorStatus{Type: dataError, err: fmt.Errorf("[processData] failed to unmarshal price data: %v", string(body))}
+		return nil, fmt.Errorf("[data parser] failed to unmarshal Price data: %w", err)
 	}
 
-	if priceData.Snapshot {
-		// the snapshot includes a lot of data. we just don't wanna print it.
-		return nil
-	}
-
-	fmt.Printf("----------------------\n%v\n", priceData)
-
-	return nil
-}
-
-func extractPingData(data map[string]interface{}) (int64, error) {
-	iData, ok := data["data"]
-	if !ok {
-		return 0, fmt.Errorf("[processStream] received a ping message but no ping data: %v", data)
-	}
-	pingData, ok := iData.(int64)
-	if !ok {
-		return 0, fmt.Errorf("[processStream] unkown field type, field 'data' for ping message expected to be int64: %v", data)
-	}
-	return pingData, nil
-}
-
-func extractDataType(iDataType interface{}) (string, error) {
-	dataType, ok := iDataType.(string)
-	if !ok {
-		return "", fmt.Errorf("[processStream] unkown field type, field 'type' expected to be string: %v", iDataType)
-	}
-	return dataType, nil
-}
-
-func unmarshalData(body []byte) (map[string]interface{}, error) {
-	var data map[string]interface{}
-	err := json.Unmarshal(body, &data)
-	if err != nil {
-		return nil, fmt.Errorf("[unmarshalData] failed to unmarshal the data: %w", err)
-	}
-	return data, nil
+	return priceData, nil
 }

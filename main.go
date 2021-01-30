@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/hedisam/CryptoXchange/config"
 	"github.com/hedisam/CryptoXchange/datasource/shrimpy"
 	"log"
@@ -27,15 +28,24 @@ func bbo(cfg *config.Config) {
 
 	time.AfterFunc(5 * time.Minute, func() {
 		defer close(done)
-		select {
-		case <-time.After(100 * time.Second):
-			log.Println("Terminating the job")
-		}
+		log.Println("Terminating the job")
 	})
 
 	log.Println("[!] Start streaming...")
-	err = ds.BBOStream(done, "BTC-USD")
+	stream, err := ds.BBO(done, "BTC-USD")
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	for data := range stream {
+		if data.Err != nil {
+			log.Println("bbo:", data.Err)
+			return
+		} else if data.Price.Snapshot {
+			fmt.Println("[!] skipping the snapshot...")
+			continue
+		}
+
+		fmt.Println(data.Price)
 	}
 }
