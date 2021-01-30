@@ -12,13 +12,13 @@ import (
 func getToken(cfg *shrimpyConfig) (string, error) {
 	resp, err := Get(cfg, tokenPath)
 	if err != nil {
-		return "", fmt.Errorf("[getToken] request failed: %w", err)
+		return "", fmt.Errorf("token request failed: %w", err)
 	}
 
 	var token wsToken
 	err = json.Unmarshal(resp, &token)
 	if err != nil {
-		return "", fmt.Errorf("[getToken] failed to unmarshal the wsToken: %w", err)
+		return "", fmt.Errorf("couln't decode the token: %w", err)
 	}
 
 	return token.Token, err
@@ -35,13 +35,13 @@ func createSignature(secretKey, requestPath string, method string, body []byte) 
 	preHash := fmt.Sprint(requestPath, method, nonce, bodyStr)
 	secretKeyDecoded, err := base64.StdEncoding.DecodeString(secretKey)
 	if err != nil {
-		return "", 0, fmt.Errorf("[createSignature] decoding secret key failed: %w", err)
+		return "", 0, fmt.Errorf("couldn't decode the secret key: %w", err)
 	}
 
 	h := hmac.New(sha256.New, secretKeyDecoded)
 	_, err = h.Write([]byte(preHash))
 	if err != nil {
-		return "", 0, fmt.Errorf("[createSignature] failed to generate the hmac sha256 signature: %w", err)
+		return "", 0, fmt.Errorf("could not generate the hmac sha256 signature: %w", err)
 	}
 
 	signature := base64.StdEncoding.EncodeToString(h.Sum(nil))

@@ -7,10 +7,13 @@ type StreamData struct {
 	Err   error
 }
 
-func outputer(done <-chan struct{}, in <-chan interface{}, errors <-chan error, upstream chan interface{}) <-chan StreamData {
+// filter filters out the actual price data and errors from ping messages.
+func filter(done <-chan struct{}, in <-chan interface{}, errors <-chan error, upstream chan interface{}) <-chan StreamData {
 	output := make(chan StreamData)
 	go func() {
 		defer close(output)
+		// although the filter stage doesn't own the upstream channel, but we're closing it here since this is the
+		// last place where we're writing in it.
 		defer close(upstream)
 		for {
 			select {
@@ -36,7 +39,7 @@ func outputer(done <-chan struct{}, in <-chan interface{}, errors <-chan error, 
 				default:
 					select {
 					case <-done:
-					case output <- StreamData{Err: fmt.Errorf("unknown parsed data type: %v", parsed)}:
+					case output <- StreamData{Err: fmt.Errorf("shrimpy data source filter: unknown data type: %v", parsed)}:
 					}
 				}
 			}
@@ -45,4 +48,3 @@ func outputer(done <-chan struct{}, in <-chan interface{}, errors <-chan error, 
 
 	return output
 }
-

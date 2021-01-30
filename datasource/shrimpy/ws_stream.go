@@ -7,7 +7,7 @@ import (
 )
 
 type dataStream struct {
-	data <-chan []byte
+	data   <-chan []byte
 	errors <-chan error
 }
 
@@ -15,13 +15,16 @@ type dataStream struct {
 func (shrimpy *Shrimpy) createStream(done <-chan struct{}, upstreamChan <-chan interface{}) (*dataStream, error) {
 	client, err := shrimpy.setupWSConnection()
 	if err != nil {
-		return nil, fmt.Errorf("[createStream] couldn't connect to the ws server: %w", err)
+		return nil, fmt.Errorf("failed to setup a shrimpy ws connection: %w", err)
 	}
 
 	dataChan := make(chan []byte) // incoming messages will be pushed to the data channel.
+	errors := make(chan error)
+
+	// encapsulating send and receive methods in streamConnection
 	connection := &streamConnection{
 		client: client,
-		errors: make(chan error),
+		errors: errors,
 		wg:     sync.WaitGroup{},
 	}
 
@@ -35,21 +38,21 @@ func (shrimpy *Shrimpy) createStream(done <-chan struct{}, upstreamChan <-chan i
 	// synchronized since upstream and receiver both write to the same error channel.
 	connection.dispose()
 
-	return &dataStream{data: dataChan, errors: connection.errors}, nil
+	return &dataStream{data: dataChan, errors: errors}, nil
 }
 
 func (shrimpy *Shrimpy) setupWSConnection() (*websocket.Conn, error) {
 	// the ws server requires a valid token
 	token, err := getToken(shrimpy.config)
 	if err != nil {
-		return nil, fmt.Errorf("[setupWSConnection] couldn't get a websocket token: %w", err)
+		return nil, fmt.Errorf("couldn't get a websocket token: %w", err)
 	}
 
 	// connecting to the server
 	url := fmt.Sprintf("%s?token=%s", wsBaseUrl, token)
 	client, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("[setupWSConnection] websocket dial failed: %w", err)
+		return nil, fmt.Errorf("failed to dial websocket: %w", err)
 	}
 	return client, nil
 }

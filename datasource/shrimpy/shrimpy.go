@@ -10,11 +10,14 @@ const (
 	wsBaseUrl = "wss://ws-feed.shrimpy.io"
 	tokenPath = "/v1/ws/token"
 
-	apiKeyHeader	= "DEV-SHRIMPY-API-KEY"
-	apiNonceHeader  = "DEV-SHRIMPY-API-NONCE"
-	apiSigHeader	= "DEV-SHRIMPY-API-SIGNATURE"
+	apiKeyHeader   = "DEV-SHRIMPY-API-KEY"
+	apiNonceHeader = "DEV-SHRIMPY-API-NONCE"
+	apiSigHeader   = "DEV-SHRIMPY-API-SIGNATURE"
 
-	exchange	= "coinbasepro"
+	exchange       = "coinbasepro"
+	ping           = "ping"
+	pong           = "pong"
+	shpySubsErrors = "errors"
 )
 
 type Shrimpy struct {
@@ -23,7 +26,7 @@ type Shrimpy struct {
 
 func NewShrimpyDataSource(cfg *config.Config) (*Shrimpy, error) {
 	if cfg.DataSource.APIKey == "" || cfg.DataSource.SecretKey == "" {
-		return nil, fmt.Errorf("[ShrimpyDataSource] invalid api_key/secret_key")
+		return nil, fmt.Errorf("shrimpy: invalid data source api/secret key")
 	}
 
 	shConfig := &shrimpyConfig{

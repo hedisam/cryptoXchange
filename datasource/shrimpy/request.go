@@ -9,12 +9,12 @@ import (
 func Get(cfg *shrimpyConfig, path string) ([]byte, error) {
 	signature, nonce, err := createSignature(cfg.SecretKey(), path, http.MethodGet, nil)
 	if err != nil {
-		return nil, fmt.Errorf("[Get] couldn't create request's signature: %w", err)
+		return nil, fmt.Errorf("failed to create api signature: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodGet, baseUrl+path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("[Get] coudln't create http request: %w", err)
+		return nil, fmt.Errorf("coudln't create http request: %w", err)
 	}
 
 	// signing the request
@@ -25,20 +25,19 @@ func Get(cfg *shrimpyConfig, path string) ([]byte, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("[Get] http request failed: %w", err)
+		return nil, fmt.Errorf("http request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("[Get] http status code != 200 -> status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("http request not accepted: status code: %d", resp.StatusCode)
 	}
 
 	// Todo: don't use ioutil RealAll. Response body might be large.
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("[Get] couldn't read the response body: %w", err)
+		return nil, fmt.Errorf("couldn't read the response body: %w", err)
 	}
 
 	return b, nil
 }
-

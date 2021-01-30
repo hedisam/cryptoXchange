@@ -9,9 +9,9 @@ import (
 )
 
 func main() {
-	cfg, err := config.ReadConfig("config/config.json")
+	cfg, err := config.Read("config/config1.json")
 	if err != nil {
-		panic(err)
+		log.Fatalf("%+v", err)
 	}
 	log.Println("[!] config file read")
 
@@ -26,7 +26,7 @@ func bbo(cfg *config.Config) {
 
 	done := make(chan struct{})
 
-	time.AfterFunc(5 * time.Minute, func() {
+	time.AfterFunc(5*time.Minute, func() {
 		defer close(done)
 		log.Println("Terminating the job")
 	})

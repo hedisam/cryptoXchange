@@ -11,22 +11,21 @@ type Config struct {
 }
 
 type DataSourceConfig struct {
-	APIKey string `json:"api_key"`
+	APIKey    string `json:"api_key"`
 	SecretKey string `json:"secret_key"`
 }
 
-func ReadConfig(path string) (*Config, error) {
+func Read(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("[ReadConfig] failed to read the config file: %w", err)
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	var config *Config
 	err = json.NewDecoder(f).Decode(&config)
 	if err != nil {
-		return nil, fmt.Errorf("[ReadConfig] failed to decode the config json data: %w", err)
+		return nil, fmt.Errorf("failed to decode the json config data: %w", err)
 	}
 
 	return config, nil
 }
-

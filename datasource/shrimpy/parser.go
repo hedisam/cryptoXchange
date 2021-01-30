@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func parser(done <-chan struct{}, input <-chan []byte, errIn <- chan error) (<-chan interface{}, <-chan error) {
+func parser(done <-chan struct{}, input <-chan []byte, errIn <-chan error) (<-chan interface{}, <-chan error) {
 	output := make(chan interface{})
 	errors := make(chan error)
 	go func() {
@@ -13,9 +13,12 @@ func parser(done <-chan struct{}, input <-chan []byte, errIn <- chan error) (<-c
 		defer close(errors)
 		for {
 			select {
-			case <-done: return
+			case <-done:
+				return
 			case rawData, ok := <-input:
-				if !ok {return}
+				if !ok {
+					return
+				}
 				parsedData, err := parse(rawData)
 				if err != nil {
 					select {
@@ -44,29 +47,29 @@ func parse(b []byte) (interface{}, error) {
 	var data unknownData
 	err := json.Unmarshal(b, &data)
 	if err != nil {
-		return nil, fmt.Errorf("[data parser] unable to parse data: %w", err)
+		return nil, fmt.Errorf("shrimpy parser: unable to unmarshal data: %w", err)
 	}
 
 	if data.Type != "" {
-		if data.Type == "ping" {
-			return pingPong{Type: "pong", Data: data.Data}, nil
-		} else if data.Type == "error" {
-			return nil, fmt.Errorf("error message from the server; code %d - message: %s",
+		if data.Type == ping {
+			return pingPong{Type: pong, Data: data.Data}, nil
+		} else if data.Type == shpySubsErrors {
+			return nil, fmt.Errorf("shrimpy ws subscription: error message: code %d - message: %s",
 				data.Code, data.Message)
 		} else {
-			return nil, fmt.Errorf("[data parser] unknown data received: %v", data)
+			return nil, fmt.Errorf("shrimpy parser: unknown data received: %v", data)
 		}
 	}
 
 	if data.Exchange == "" {
-		return nil, fmt.Errorf("[data parser] unknown data received: %v", data)
+		return nil, fmt.Errorf("shrimpy parser: unknown data received: %v", data)
 	}
 
 	// we have a Price data
 	var priceData PriceData
 	err = json.Unmarshal(b, &priceData)
 	if err != nil {
-		return nil, fmt.Errorf("[data parser] failed to unmarshal Price data: %w", err)
+		return nil, fmt.Errorf("shrimpy parser: failed to unmarshal price data: %w", err)
 	}
 
 	return priceData, nil
