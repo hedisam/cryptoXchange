@@ -54,7 +54,7 @@ func parse(b []byte) (interface{}, error) {
 		if data.Type == ping {
 			return pingPong{Type: pong, Data: data.Data}, nil
 		} else if data.Type == shpySubsErrors {
-			return nil, fmt.Errorf("shrimpy ws subscription: error message: code %d - message: %s",
+			return nil, fmt.Errorf("shrimpy ws subscription: error message received: code %d - message: %s",
 				data.Code, data.Message)
 		} else {
 			return nil, fmt.Errorf("shrimpy parser: unknown data received: %v", data)

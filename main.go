@@ -9,16 +9,24 @@ import (
 )
 
 func main() {
-	cfg, err := config.Read("config/config1.json")
+	cfg, err := config.Read("config/config.json")
 	if err != nil {
 		log.Fatalf("%+v", err)
 	}
 	log.Println("[!] config file read")
 
-	bbo(cfg)
+	stream(cfg, orderBook)
 }
 
-func bbo(cfg *config.Config) {
+func bbo(done <-chan struct{}, ds *shrimpy.Shrimpy) (<-chan shrimpy.StreamData, error) {
+	return ds.BBO(done, "BTC-USD", "ETH-USD")
+}
+
+func orderBook(done <-chan struct{}, ds *shrimpy.Shrimpy) (<-chan shrimpy.StreamData, error) {
+	return ds.OrderBook(done, "btc-usd")
+}
+
+func stream(cfg *config.Config, streamer func(done <-chan struct{}, ds *shrimpy.Shrimpy) (<-chan shrimpy.StreamData, error)) {
 	ds, err := shrimpy.NewShrimpyDataSource(cfg)
 	if err != nil {
 		panic(err)
@@ -32,20 +40,40 @@ func bbo(cfg *config.Config) {
 	})
 
 	log.Println("[!] Start streaming...")
-	stream, err := ds.BBO(done, "BTC-USD")
+	stream, err := streamer(done, ds)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for data := range stream {
+	limitedStream := take(done, stream, 5) // including the snapshot
+
+	for data := range limitedStream {
 		if data.Err != nil {
-			log.Println("bbo:", data.Err)
+			log.Println("stream:", data.Err)
 			return
 		} else if data.Price.Snapshot {
 			fmt.Println("[!] skipping the snapshot...")
 			continue
 		}
 
-		fmt.Println(data.Price)
+		fmt.Printf("------------------------\n%v\n", data.Price)
 	}
+}
+
+func take(done <-chan struct{}, in <-chan shrimpy.StreamData, count int) <-chan shrimpy.StreamData {
+	out := make(chan shrimpy.StreamData)
+	go func() {
+		defer close(out)
+		for i := 0; i < count; i++ {
+			select {
+			case <-done: return
+			case data := <-in:
+				select {
+				case <-done: return
+				case out <- data:
+				}
+			}
+		}
+	}()
+	return out
 }

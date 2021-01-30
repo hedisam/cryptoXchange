@@ -19,7 +19,7 @@ type PriceData struct {
 	Content PriceContent `json:"content"`
 }
 
-type subscription struct {
+type Subscription struct {
 	Type string `json:"type"`
 	Exchange string `json:"exchange"`
 	Pair string `json:"pair"`
