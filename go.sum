@@ -1,4 +1,4 @@
 github.com/gorilla/websocket v1.4.2 h1:+/TMaTYc4QFitKJxsQ7Yye35DkWvkdLcvGKqM+x0Ufc=
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
-github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/hedisam/shrimpygo v0.0.0-20210201202344-9e71ace1b799 h1:APKMdsWGl3+8BOysmhM7jcnsznj8Q6Xl9M7s6Fu7G+Y=
+github.com/hedisam/shrimpygo v0.0.0-20210201202344-9e71ace1b799/go.mod h1:FTleqFTBFsOhr+zaGnu9ovsYdtXGLowbA2Cvy54TbBc=

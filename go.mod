@@ -2,7 +2,4 @@ module github.com/hedisam/CryptoXchange
 
 go 1.15
 
-require (
-	github.com/gorilla/websocket v1.4.2
-	github.com/pkg/errors v0.9.1 // indirect
-)
+require github.com/hedisam/shrimpygo v0.0.0-20210201202344-9e71ace1b799

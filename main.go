@@ -1,75 +1,70 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/hedisam/CryptoXchange/config"
-	"github.com/hedisam/CryptoXchange/datasource/shrimpy"
+	"github.com/hedisam/shrimpygo"
 	"log"
-	"time"
 )
 
 func main() {
-	cfg, err := config.Read("config/config.json")
+	appConfig, err := config.Read("config/config.json")
 	if err != nil {
-		log.Fatalf("%+v", err)
+		log.Fatal(err)
 	}
-	log.Println("[!] config file read")
-
-	stream(cfg, orderBook)
-}
-
-func bbo(done <-chan struct{}, ds *shrimpy.Shrimpy) (<-chan shrimpy.StreamData, error) {
-	return ds.BBO(done, "BTC-USD", "ETH-USD")
-}
-
-func orderBook(done <-chan struct{}, ds *shrimpy.Shrimpy) (<-chan shrimpy.StreamData, error) {
-	return ds.OrderBook(done, "btc-usd")
-}
-
-func stream(cfg *config.Config, streamer func(done <-chan struct{}, ds *shrimpy.Shrimpy) (<-chan shrimpy.StreamData, error)) {
-	ds, err := shrimpy.NewShrimpyDataSource(cfg)
-	if err != nil {
-		panic(err)
-	}
-
-	done := make(chan struct{})
-
-	time.AfterFunc(5*time.Minute, func() {
-		defer close(done)
-		log.Println("Terminating the job")
+	cli, err := shrimpygo.NewShrimpyClient(shrimpygo.Config{
+		PublicKey:  appConfig.DataSource.APIKey,
+		PrivateKey: appConfig.DataSource.SecretKey,
 	})
-
-	log.Println("[!] Start streaming...")
-	stream, err := streamer(done, ds)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	limitedStream := take(done, stream, 5) // including the snapshot
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	for data := range limitedStream {
-		if data.Err != nil {
-			log.Println("stream:", data.Err)
+	ws, err := cli.Websocket(ctx, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ws.Subscribe(shrimpygo.BBOSubs("binance", "btc-usdt"))
+
+	limitedStream := take(ctx, ws.Stream(), 10)
+
+	for update := range limitedStream {
+		switch data := update.(type) {
+		case *shrimpygo.OrderBook:
+			if data.Snapshot {
+				continue
+			}
+			fmt.Println("BBO:", data)
+		case error:
+			fmt.Println("err received:", data)
 			return
-		} else if data.Price.Snapshot {
-			fmt.Println("[!] skipping the snapshot...")
-			continue
+		default:
+			fmt.Printf("unknown data: %T\n", update)
+			return
 		}
-
-		fmt.Printf("------------------------\n%v\n", data.Price)
 	}
 }
 
-func take(done <-chan struct{}, in <-chan shrimpy.StreamData, count int) <-chan shrimpy.StreamData {
-	out := make(chan shrimpy.StreamData)
+func take(ctx context.Context, in <-chan interface{}, count int) <-chan interface{} {
+	out := make(chan interface{})
 	go func() {
 		defer close(out)
-		for i := 0; i < count; i++ {
+		for i := 0; i <= count; i++ {
 			select {
-			case <-done: return
-			case data := <-in:
+			case <-ctx.Done():
+				return
+			case data, ok := <-in:
+				if !ok {
+					return
+				}
 				select {
-				case <-done: return
+				case <-ctx.Done():
+					return
 				case out <- data:
 				}
 			}
