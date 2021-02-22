@@ -1,14 +1,17 @@
-package main
+package shrimpymock
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/hedisam/CryptoXchange/config"
 	"github.com/hedisam/shrimpygo"
+	"io/ioutil"
 	"log"
+	"os"
 )
 
-func main() {
+func UpdateMockData() {
 	appConfig, err := config.Read("config/config.json")
 	if err != nil {
 		log.Fatal(err)
@@ -24,14 +27,31 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ws, err := cli.Websocket(ctx, 0)
+	ws, err := cli.Websocket(ctx, 10)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ws.Subscribe(shrimpygo.BBOSubs("binance", "btc-usdt"))
+	ws.Subscribe(shrimpygo.BBOSubs("coinbasepro", "btc-usd"))
+	ws.Subscribe(shrimpygo.BBOSubs("binance", "btt-usdt"))
 
-	limitedStream := take(ctx, ws.Stream(), 10)
+	n := 100
+	limitedStream := take(ctx, ws.Stream(), n)
+	dataArray := make([]*shrimpygo.OrderBook, n-1)
+	i := 0
+
+	defer func() {
+		// write data to a json file
+		fmt.Println("writing data")
+		b, err := json.Marshal(dataArray)
+		if err != nil {
+			log.Println("error writing data to json file:", err)
+			return
+		}
+		if err = ioutil.WriteFile("price_data.json", b, os.ModePerm); err != nil {
+			log.Println("Failed to write price_data:", err)
+		}
+	}()
 
 	for update := range limitedStream {
 		switch data := update.(type) {
@@ -39,7 +59,9 @@ func main() {
 			if data.Snapshot {
 				continue
 			}
-			fmt.Println("BBO:", data)
+			dataArray[i] = data
+			i++
+			fmt.Printf("BBO[%d]: %v\n", i, data)
 		case error:
 			fmt.Println("err received:", data)
 			return
