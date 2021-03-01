@@ -18,7 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PriceServiceClient interface {
-	StreamPrice(ctx context.Context, opts ...grpc.CallOption) (PriceService_StreamPriceClient, error)
+	StreamPrice(ctx context.Context, in *QuoteRequest, opts ...grpc.CallOption) (PriceService_StreamPriceClient, error)
 }
 
 type priceServiceClient struct {
@@ -29,27 +29,28 @@ func NewPriceServiceClient(cc grpc.ClientConnInterface) PriceServiceClient {
 	return &priceServiceClient{cc}
 }
 
-func (c *priceServiceClient) StreamPrice(ctx context.Context, opts ...grpc.CallOption) (PriceService_StreamPriceClient, error) {
+func (c *priceServiceClient) StreamPrice(ctx context.Context, in *QuoteRequest, opts ...grpc.CallOption) (PriceService_StreamPriceClient, error) {
 	stream, err := c.cc.NewStream(ctx, &PriceService_ServiceDesc.Streams[0], "/grpcapi.PriceService/StreamPrice", opts...)
 	if err != nil {
 		return nil, err
 	}
 	x := &priceServiceStreamPriceClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
 	return x, nil
 }
 
 type PriceService_StreamPriceClient interface {
-	Send(*QuoteRequest) error
 	Recv() (*QuoteReply, error)
 	grpc.ClientStream
 }
 
 type priceServiceStreamPriceClient struct {
 	grpc.ClientStream
-}
-
-func (x *priceServiceStreamPriceClient) Send(m *QuoteRequest) error {
-	return x.ClientStream.SendMsg(m)
 }
 
 func (x *priceServiceStreamPriceClient) Recv() (*QuoteReply, error) {
@@ -64,7 +65,7 @@ func (x *priceServiceStreamPriceClient) Recv() (*QuoteReply, error) {
 // All implementations must embed UnimplementedPriceServiceServer
 // for forward compatibility
 type PriceServiceServer interface {
-	StreamPrice(PriceService_StreamPriceServer) error
+	StreamPrice(*QuoteRequest, PriceService_StreamPriceServer) error
 	mustEmbedUnimplementedPriceServiceServer()
 }
 
@@ -72,7 +73,7 @@ type PriceServiceServer interface {
 type UnimplementedPriceServiceServer struct {
 }
 
-func (UnimplementedPriceServiceServer) StreamPrice(PriceService_StreamPriceServer) error {
+func (UnimplementedPriceServiceServer) StreamPrice(*QuoteRequest, PriceService_StreamPriceServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamPrice not implemented")
 }
 func (UnimplementedPriceServiceServer) mustEmbedUnimplementedPriceServiceServer() {}
@@ -89,12 +90,15 @@ func RegisterPriceServiceServer(s grpc.ServiceRegistrar, srv PriceServiceServer)
 }
 
 func _PriceService_StreamPrice_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PriceServiceServer).StreamPrice(&priceServiceStreamPriceServer{stream})
+	m := new(QuoteRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PriceServiceServer).StreamPrice(m, &priceServiceStreamPriceServer{stream})
 }
 
 type PriceService_StreamPriceServer interface {
 	Send(*QuoteReply) error
-	Recv() (*QuoteRequest, error)
 	grpc.ServerStream
 }
 
@@ -104,14 +108,6 @@ type priceServiceStreamPriceServer struct {
 
 func (x *priceServiceStreamPriceServer) Send(m *QuoteReply) error {
 	return x.ServerStream.SendMsg(m)
-}
-
-func (x *priceServiceStreamPriceServer) Recv() (*QuoteRequest, error) {
-	m := new(QuoteRequest)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 // PriceService_ServiceDesc is the grpc.ServiceDesc for PriceService service.
@@ -126,8 +122,7 @@ var PriceService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "StreamPrice",
 			Handler:       _PriceService_StreamPrice_Handler,
 			ServerStreams: true,
-			ClientStreams: true,
 		},
 	},
-	Metadata: "grpcapi.proto",
+	Metadata: "userservice/grpcapi/grpcapi.proto",
 }

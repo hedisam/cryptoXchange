@@ -6,8 +6,9 @@ type Quote struct {
 }
 
 type PriceData struct {
-	Exchange string  `json:"exchange"`
-	Pair     string  `json:"pair"`
+	Exchange string `json:"exchange"`
+	Pair     string `json:"pair"`
+	Channel  string	`json:"channel"`
 	Snapshot bool    `json:"snapshot"`
 	Sequence int64   `json:"sequence"`
 	Asks     []Quote `json:"asks"`

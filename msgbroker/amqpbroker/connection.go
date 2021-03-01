@@ -1,10 +1,19 @@
-package amqp
+package amqpbroker
 
 import (
 	"github.com/streadway/amqp"
 	"log"
+	"os"
 	"time"
 )
+
+func ConnectFromEnv(retryInterval time.Duration, maxRetries int) <-chan *amqp.Connection {
+	url := os.Getenv("AMQP_URL")
+	if url == "" {
+		url = "amqp://localhost:5672"
+	}
+	return Connect(url, retryInterval, maxRetries)
+}
 
 func Connect(url string, retryInterval time.Duration, maxRetries int) <-chan *amqp.Connection {
 	connChan := make(chan *amqp.Connection)

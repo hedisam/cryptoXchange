@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/hedisam/CryptoXchange/userservice/grpcapi";
+option go_package = "github.com/hedisam/Cryptoxchange/userservice/grpcapi";
 option java_multiple_files = true;
 option java_package = "io.hidayat.cryptoxchange";
 option java_outer_classname = "GrpcApi";
@@ -8,7 +8,7 @@ option java_outer_classname = "GrpcApi";
 package grpcapi;
 
 service PriceService {
-  rpc StreamPrice(stream QuoteRequest) returns (stream QuoteReply) {}
+  rpc StreamPrice(QuoteRequest) returns (stream QuoteReply) {}
 }
 
 message QuoteRequest {

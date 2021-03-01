@@ -1,4 +1,4 @@
-package amqp
+package amqpbroker
 
 import (
 	"context"
