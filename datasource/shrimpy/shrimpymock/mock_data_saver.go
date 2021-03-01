@@ -27,15 +27,15 @@ func UpdateMockData() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ws, err := cli.Websocket(ctx, 10)
+	ws, err := cli.Websocket(ctx, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	ws.Subscribe(shrimpygo.BBOSubs("coinbasepro", "eth-usd"))
 	ws.Subscribe(shrimpygo.BBOSubs("coinbasepro", "btc-usd"))
-	ws.Subscribe(shrimpygo.BBOSubs("binance", "btt-usdt"))
 
-	n := 100
+	n := 1000
 	limitedStream := take(ctx, ws.Stream(), n)
 	dataArray := make([]*shrimpygo.OrderBook, n-1)
 	i := 0
@@ -48,7 +48,7 @@ func UpdateMockData() {
 			log.Println("error writing data to json file:", err)
 			return
 		}
-		if err = ioutil.WriteFile("price_data.json", b, os.ModePerm); err != nil {
+		if err = ioutil.WriteFile("datasource/shrimpy/shrimpymock/price_data.json", b, os.ModePerm); err != nil {
 			log.Println("Failed to write price_data:", err)
 		}
 	}()

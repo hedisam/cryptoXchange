@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"sync"
+	"time"
 )
 
 func Streamer(ctx context.Context, path string) (<-chan *models.PriceData, <-chan error, error) {
@@ -31,14 +32,19 @@ func fileStreamer(done <-chan struct{}, path string) (<-chan shrimpygo.OrderBook
 
 	rawStream := make(chan shrimpygo.OrderBook)
 
-	// sending raw data to the rawStream chan
 	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
 		defer close(rawStream)
 	LOOP:
 		for i := 0; i < len(data); i++ {
 			select {
-			case rawStream <- data[i]:
 			case <-done: return
+			case <-ticker.C:
+				select {
+				case rawStream <- data[i]:
+				case <-done: return
+				}
 			}
 		}
 		goto LOOP
@@ -84,6 +90,7 @@ func parse(data shrimpygo.OrderBook) (priceData *models.PriceData, err error) {
 	priceData = &models.PriceData{
 		Exchange: data.Exchange,
 		Pair:     data.Pair,
+		Channel:  data.Channel,
 		Snapshot: data.Snapshot,
 		Sequence: data.Sequence,
 		Asks: make([]models.Quote, len(data.Content.Asks)),
